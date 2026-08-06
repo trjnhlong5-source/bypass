@@ -1,0 +1,13 @@
+{
+  "status": "success",
+  "code": 200,
+  "isLicenseValid": true,
+  "isKeyBlocked": false,
+  "isExpire": false,
+  "isKeyReset": false,
+  "expireAt": "2099-12-31",
+  "keyType": "premium",
+  "activationState": "active",
+  "graceUntil": null,
+  "device_bound": false
+}
