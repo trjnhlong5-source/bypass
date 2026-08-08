@@ -1,0 +1,41 @@
+name: Build Dylib with Xcode
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Dobby
+        run: |
+          git clone --depth=1 https://github.com/jmpews/Dobby.git
+          cd Dobby
+          mkdir build && cd build
+          cmake .. -DCMAKE_OSX_ARCHITECTURES=arm64
+          make -j4
+          sudo make install
+
+      - name: Compile dylib with clang
+        run: |
+          SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
+          clang++ -arch arm64 -dynamiclib \
+            -isysroot $SDKROOT \
+            -std=c++17 -fobjc-arc \
+            -I/usr/local/include \
+            -L/usr/local/lib \
+            -ldobby \
+            -framework Foundation \
+            -framework UIKit \
+            -o FreeFireBypass.dylib \
+            main.mm
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeFireBypass.dylib
+          path: FreeFireBypass.dylib
