@@ -1,0 +1,38 @@
+name: Build FreeFireBypass Dylib
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Theos
+        run: |
+          git clone --depth=1 https://github.com/theos/theos.git $HOME/theos
+          cd $HOME/theos
+          git submodule update --init --depth=1 --recursive
+
+      - name: Download iOS SDK
+        run: |
+          git clone --depth=1 https://github.com/theos/sdks.git /tmp/theos-sdks
+          cp -r /tmp/theos-sdks/iPhoneOS16.5.sdk $HOME/theos/sdks/
+
+      - name: Build dylib
+        run: |
+          export THEOS=$HOME/theos
+          export PATH=$HOME/theos/bin:$PATH
+          make FINALPACKAGE=1
+
+      - name: Upload dylib
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeFireBypass-OB54
+          path: .theos/obj/FreeFireBypass.dylib
+          retention-days: 30
