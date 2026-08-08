@@ -1,0 +1,33 @@
+name: Build FreeFireBypass Dylib
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Theos
+        uses: theos/theos@v1
+        with:
+          sdk: '16.5'
+          version: 'latest'
+
+      - name: Build dylib
+        run: |
+          export THEOS=$HOME/theos
+          export PATH=$HOME/theos/bin:$PATH
+          make FINALPACKAGE=1
+
+      - name: Upload dylib
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeFireBypass-OB54
+          path: .theos/obj/FreeFireBypass.dylib
+          retention-days: 30
