@@ -1,0 +1,16 @@
+THEOS_DEVICE_IP ?= 192.168.1.x
+THEOS_DEVICE_PORT ?= 22
+
+TARGET := iphone:clang:latest:14.0
+ARCHS  := arm64
+
+include $(THEOS)/makefiles/common.mk
+
+DYLIB_NAME := FreeFireBypass
+
+$(DYLIB_NAME)_FILES    := src/main.mm
+$(DYLIB_NAME)_CFLAGS   := -fobjc-arc
+$(DYLIB_NAME)_CCFLAGS  := -std=c++17 -fobjc-arc
+$(DYLIB_NAME)_LIBRARIES := substrate
+
+include $(THEOS)/makefiles/dylib.mk
