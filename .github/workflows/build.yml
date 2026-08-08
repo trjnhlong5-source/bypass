@@ -1,0 +1,14 @@
+- name: Build dylib
+  run: |
+    SDK=/tmp/sdks/iPhoneOS16.5.sdk
+    clang++ \
+      -arch arm64 \
+      -dynamiclib \
+      -isysroot $SDK \
+      -miphoneos-version-min=14.0 \
+      -std=c++17 \
+      -fobjc-arc \
+      -framework Foundation \
+      -framework CoreFoundation \
+      -o FreeFireBypass.dylib \
+      src/main.mm
