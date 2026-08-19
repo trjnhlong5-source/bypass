@@ -1,0 +1,119 @@
+// HoleColaBypass.mm — Fixed version
+#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
+#include <objc/runtime.h>
+#include <dlfcn.h>
+#include <sys/sysctl.h>
+#include <mach/mach.h>
+
+// Bypass ptrace anti-debug
+static int hooked_ptrace(int request, pid_t pid, caddr_t addr, int data) {
+    return 0;  // always succeed
+}
+
+// Bypass sysctl anti-debug  
+static int hooked_sysctl(int *name, u_int namelen, void *oldp, 
+                          size_t *oldlenp, void *newp, size_t newlen) {
+    // Block P_TRACED check
+    if (namelen == 4 && name[0] == CTL_KERN && 
+        name[1] == KERN_PROC && name[2] == KERN_PROC_PID) {
+        int result = sysctl(name, namelen, oldp, oldlenp, newp, newlen);
+        if (result == 0 && oldp) {
+            struct kinfo_proc *info = (struct kinfo_proc *)oldp;
+            info->kp_proc.p_flag &= ~P_TRACED;  // clear debug flag
+        }
+        return result;
+    }
+    return sysctl(name, namelen, oldp, oldlenp, newp, newlen);
+}
+
+// Dump all class names để tìm key validator
+static void dumpClasses(void) {
+    unsigned int count = 0;
+    const char **classes = objc_copyClassNamesForImage(
+        [[NSBundle mainBundle] executablePath].UTF8String, &count);
+    
+    NSMutableArray *arr = [NSMutableArray array];
+    for (unsigned int i = 0; i < count; i++) {
+        [arr addObject:[NSString stringWithUTF8String:classes[i]]];
+    }
+    free(classes);
+    
+    // Log ra để m đọc (check Console.app)
+    NSLog(@"[AR0] Classes: %@", arr);
+}
+
+// Swizzle NSURLSession — fake success response
+typedef void (^CompletionHandler)(NSData*, NSURLResponse*, NSError*);
+static IMP orig_dataTask = NULL;
+
+static id hooked_dataTask(id self, SEL _cmd,
+                           NSURLRequest *req,
+                           CompletionHandler handler) {
+    NSString *url = req.URL.absoluteString.lowercaseString;
+    
+    // DataDome endpoints + HoleCola verify endpoints
+    BOOL block = [url containsString:@"datadome"] ||
+                 [url containsString:@"key"] ||
+                 [url containsString:@"verif"] ||
+                 [url containsString:@"licens"] ||
+                 [url containsString:@"activ"] ||
+                 [url containsString:@"session"] ||
+                 [url containsString:@"holecola"] ||
+                 [url containsString:@"vng"];  // VNG = publisher HoleCola
+    
+    if (block && handler) {
+        NSString *fake = @"{\"success\":\"1\","
+                          "\"active\":\"1\","
+                          "\"session_token\":\"bypass_ar0\","
+                          "\"expire_date\":\"2099-12-31\","
+                          "\"server_time\":\"2025-01-01 00:00:00\"}";
+        NSData *fakeData = [fake dataUsingEncoding:NSUTF8StringEncoding];
+        NSHTTPURLResponse *fakeResp = [[NSHTTPURLResponse alloc]
+            initWithURL:req.URL statusCode:200
+            HTTPVersion:@"HTTP/1.1"
+            headerFields:@{@"Content-Type":@"application/json"}];
+        
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2*NSEC_PER_SEC)),
+            dispatch_get_main_queue(), ^{
+                handler(fakeData, fakeResp, nil);
+        });
+        return ((id(*)(id,SEL,NSURLRequest*,CompletionHandler))orig_dataTask)(
+            self, _cmd, req, nil);
+    }
+    return ((id(*)(id,SEL,NSURLRequest*,CompletionHandler))orig_dataTask)(
+        self, _cmd, req, handler);
+}
+
+__attribute__((constructor))
+static void init(void) {
+    // 1. Hook ptrace/sysctl via fishhook hoặc GOT patch
+    // (cần fishhook library — add vào build)
+    
+    // 2. Hook NSURLSession  
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5*NSEC_PER_SEC)),
+        dispatch_get_main_queue(), ^{
+        
+        // Dump classes để tìm key validator
+        dumpClasses();
+        
+        // Hook URLSession
+        Class sess = [NSURLSession class];
+        Method m = class_getInstanceMethod(sess,
+            @selector(dataTaskWithRequest:completionHandler:));
+        if (m) {
+            orig_dataTask = method_getImplementation(m);
+            method_setImplementation(m, (IMP)hooked_dataTask);
+        }
+        
+        // Force UserDefaults
+        NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+        [ud setBool:YES forKey:@"isKeyValidated"];
+        [ud setBool:YES forKey:@"keyVerified"];
+        [ud synchronize];
+        
+        NSLog(@"[AR0] bypass injected — check Console for class list");
+    });
+}
