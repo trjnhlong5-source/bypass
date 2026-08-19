@@ -1,0 +1,224 @@
+name: Build HoleCola Bypass
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create source
+        run: |
+          mkdir -p src
+          cat > src/main.mm << 'CPPEOF'
+          #import <Foundation/Foundation.h>
+          #import <UIKit/UIKit.h>
+          #include <objc/runtime.h>
+          #include <objc/message.h>
+
+          // ── Swizzle helper ──
+          static void swizzleMethod(Class cls, SEL orig, IMP *origPtr, IMP newImp) {
+              Method m = class_getInstanceMethod(cls, orig);
+              if (!m) return;
+              if (origPtr) *origPtr = method_getImplementation(m);
+              method_setImplementation(m, newImp);
+          }
+
+          // ── Hooks ──
+          static IMP orig_isKeyValidated     = NULL;
+          static IMP orig_setKeyVerified     = NULL;
+          static IMP orig_setIsKeyValidated  = NULL;
+          static IMP orig_dataTask           = NULL;
+
+          static BOOL hooked_isKeyValidated(id self, SEL _cmd) {
+              return YES;
+          }
+
+          static void hooked_setKeyVerified(id self, SEL _cmd, BOOL v) {
+              if (orig_setKeyVerified)
+                  ((void(*)(id,SEL,BOOL))orig_setKeyVerified)(self, _cmd, YES);
+          }
+
+          static void hooked_setIsKeyValidated(id self, SEL _cmd, BOOL v) {
+              if (orig_setIsKeyValidated)
+                  ((void(*)(id,SEL,BOOL))orig_setIsKeyValidated)(self, _cmd, YES);
+          }
+
+          typedef void (^CompletionHandler)(NSData*, NSURLResponse*, NSError*);
+
+          static id hooked_dataTask(id self, SEL _cmd,
+                                    NSURLRequest *req,
+                                    CompletionHandler handler) {
+              NSString *url = req.URL.absoluteString.lowercaseString;
+              BOOL isKeyCheck = [url containsString:@"key"]    ||
+                                [url containsString:@"verif"]  ||
+                                [url containsString:@"licens"] ||
+                                [url containsString:@"activ"]  ||
+                                [url containsString:@"session"];
+
+              if (isKeyCheck && handler) {
+                  NSString *fake = @"{\"success\":\"1\","
+                                    "\"active\":\"1\","
+                                    "\"session_token\":\"bypass_ar0\","
+                                    "\"expire_date\":\"2099-12-31\","
+                                    "\"server_time\":\"2025-01-01 00:00:00\"}";
+                  NSData *fakeData = [fake dataUsingEncoding:NSUTF8StringEncoding];
+                  NSHTTPURLResponse *fakeResp = [[NSHTTPURLResponse alloc]
+                      initWithURL:req.URL
+                       statusCode:200
+                      HTTPVersion:@"HTTP/1.1"
+                     headerFields:@{@"Content-Type":@"application/json"}];
+
+                  dispatch_after(
+                      dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.3*NSEC_PER_SEC)),
+                      dispatch_get_main_queue(), ^{
+                          handler(fakeData, fakeResp, nil);
+                  });
+
+                  // Gọi original nhưng nil handler → không process real response
+                  return ((id(*)(id,SEL,NSURLRequest*,CompletionHandler))orig_dataTask)(
+                      self, _cmd, req, nil);
+              }
+              return ((id(*)(id,SEL,NSURLRequest*,CompletionHandler))orig_dataTask)(
+                  self, _cmd, req, handler);
+          }
+
+          // ── Kill timers + force state ──
+          static void killTimers(id obj) {
+              if (!obj) return;
+              @try {
+                  for (NSString *k in @[@"verifyTimer",@"realtimeKeyTimer"]) {
+                      id t = [obj valueForKey:k];
+                      if (t && [t respondsToSelector:@selector(invalidate)])
+                          [t invalidate];
+                  }
+                  [obj setValue:@YES forKey:@"isKeyValidated"];
+                  [obj setValue:@YES forKey:@"keyVerified"];
+              } @catch (...) {}
+          }
+
+          // ── Keychain spoof: write valid state ──
+          static void spoofKeychain(void) {
+              NSMutableDictionary *q = [NSMutableDictionary dictionary];
+              q[(__bridge id)kSecClass]           = (__bridge id)kSecClassGenericPassword;
+              q[(__bridge id)kSecAttrService]     = @"HoleCola";
+              q[(__bridge id)kSecAttrAccount]     = @"keyStatus";
+              q[(__bridge id)kSecValueData]       =
+                  [@"valid" dataUsingEncoding:NSUTF8StringEncoding];
+              q[(__bridge id)kSecAttrAccessible]  =
+                  (__bridge id)kSecAttrAccessibleAlways;
+
+              SecItemDelete((__bridge CFDictionaryRef)q);
+              SecItemAdd((__bridge CFDictionaryRef)q, NULL);
+          }
+
+          // ── Apply all hooks ──
+          static void applyHooks(void) {
+              // Target class candidates
+              NSArray *candidates = @[
+                  @"GameViewController",
+                  @"MenuViewController",
+                  @"KeyManager",
+                  @"LicenseManager",
+                  @"ViewController",
+                  @"AppDelegate",
+                  @"KeyValidator",
+                  @"MainViewController"
+              ];
+
+              for (NSString *name in candidates) {
+                  Class cls = NSClassFromString(name);
+                  if (!cls) continue;
+                  swizzleMethod(cls,
+                      @selector(isKeyValidated),
+                      &orig_isKeyValidated,
+                      (IMP)hooked_isKeyValidated);
+                  swizzleMethod(cls,
+                      @selector(setKeyVerified:),
+                      &orig_setKeyVerified,
+                      (IMP)hooked_setKeyVerified);
+                  swizzleMethod(cls,
+                      @selector(setIsKeyValidated:),
+                      &orig_setIsKeyValidated,
+                      (IMP)hooked_setIsKeyValidated);
+              }
+
+              // NSURLSession hook
+              Class sess = [NSURLSession class];
+              Method m = class_getInstanceMethod(sess,
+                  @selector(dataTaskWithRequest:completionHandler:));
+              if (m) {
+                  orig_dataTask = method_getImplementation(m);
+                  method_setImplementation(m, (IMP)hooked_dataTask);
+              }
+
+              // NSUserDefaults force valid
+              NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+              [ud setBool:YES forKey:@"isKeyValidated"];
+              [ud setBool:YES forKey:@"keyVerified"];
+              [ud setObject:@"bypass_ar0" forKey:@"session_token"];
+              [ud synchronize];
+
+              // Keychain
+              spoofKeychain();
+
+              // Kill timers on root VC
+              UIWindow *win = [UIApplication sharedApplication].keyWindow;
+              if (win) {
+                  UIViewController *root = win.rootViewController;
+                  killTimers(root);
+                  if (root.presentedViewController)
+                      killTimers(root.presentedViewController);
+              }
+
+              // Notification intercept
+              [[NSNotificationCenter defaultCenter]
+                  addObserverForName:@"KeyValidatedNotification"
+                              object:nil
+                               queue:[NSOperationQueue mainQueue]
+                          usingBlock:^(NSNotification *n) {
+                  [[NSNotificationCenter defaultCenter]
+                      postNotificationName:@"KeyValidatedNotification"
+                                    object:nil
+                                  userInfo:@{@"validated":@YES}];
+              }];
+
+              NSLog(@"[AR0] bypass active 6767");
+          }
+
+          __attribute__((constructor))
+          static void init(void) {
+              dispatch_after(
+                  dispatch_time(DISPATCH_TIME_NOW,(int64_t)(1.0*NSEC_PER_SEC)),
+                  dispatch_get_main_queue(),
+                  ^{ applyHooks(); }
+              );
+          }
+          CPPEOF
+
+      - name: Get SDK
+        run: git clone --depth=1 https://github.com/theos/sdks.git /tmp/sdks
+
+      - name: Build dylib
+        run: |
+          clang++ -arch arm64 \
+            -dynamiclib \
+            -isysroot /tmp/sdks/iPhoneOS16.5.sdk \
+            -miphoneos-version-min=14.0 \
+            -std=c++17 \
+            -fobjc-arc \
+            -framework Foundation \
+            -framework UIKit \
+            -framework Security \
+            -framework CoreFoundation \
+            -o HoleColaBypass.dylib src/main.mm
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HoleColaBypass
+          path: HoleColaBypass.dylib
