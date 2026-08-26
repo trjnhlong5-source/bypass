@@ -1,0 +1,96 @@
+name: Build DLiPA Music Dylib
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Xcode command line tools
+        run: |
+          sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+          sudo xcodebuild -runFirstLaunch
+
+      - name: Create source file
+        run: |
+          cat > libplay.m << 'EOF'
+          #import <Foundation/Foundation.h>
+          #import <AVFoundation/AVFoundation.h>
+          #import <UIKit/UIKit.h>
+          #include <objc/runtime.h>
+
+          static AVAudioPlayer *_player = nil;
+
+          __attribute__((constructor))
+          static void init() {
+              dispatch_async(dispatch_get_main_queue(), ^{
+                  NSString *musicPath = [[NSBundle mainBundle] pathForResource:@"background" ofType:@"mp3"];
+                  if (!musicPath) musicPath = [[NSBundle mainBundle] pathForResource:@"background" ofType:@"wav"];
+                  
+                  if (musicPath) {
+                      NSURL *url = [NSURL fileURLWithPath:musicPath];
+                      NSError *error = nil;
+                      _player = [[AVAudioPlayer alloc] initWithContentsOfURL:url error:&error];
+                      if (error) {
+                          NSLog(@"[HexDev] ❌ Lỗi tạo player: %@", error);
+                          return;
+                      }
+                      _player.numberOfLoops = -1;
+                      _player.volume = 0.5;
+                      [_player prepareToPlay];
+                      [_player play];
+                      NSLog(@"[HexDev] 🎵 Nhạc đã phát từ dylib!");
+                      
+                      objc_setAssociatedObject([UIApplication sharedApplication], @"hexdev_player", _player, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                      
+                      [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidEnterBackgroundNotification
+                                                                        object:nil queue:nil
+                                                                    usingBlock:^(NSNotification *note) {
+                          [_player pause];
+                          NSLog(@"[HexDev] ⏸️ Nhạc dừng (background)");
+                      }];
+                      [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
+                                                                        object:nil queue:nil
+                                                                    usingBlock:^(NSNotification *note) {
+                          [_player play];
+                          NSLog(@"[HexDev] ▶️ Nhạc phát lại (foreground)");
+                      }];
+                  } else {
+                      NSLog(@"[HexDev] ❌ Không tìm thấy background.mp3 trong bundle");
+                  }
+              });
+          }
+          EOF
+
+      - name: Compile dylib
+        run: |
+          clang -dynamiclib \
+                -framework Foundation \
+                -framework AVFoundation \
+                -framework UIKit \
+                -arch arm64 \
+                -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
+                -o libplay.dylib libplay.m
+
+      - name: Upload dylib artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libplay.dylib
+          path: libplay.dylib
+
+      - name: Download insert_dylib tool
+        run: |
+          curl -L -o insert_dylib https://github.com/tyilo/insert_dylib/releases/download/1.7.0/insert_dylib
+          chmod +x insert_dylib
+
+      - name: Upload insert_dylib artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: insert_dylib
+          path: insert_dylib
