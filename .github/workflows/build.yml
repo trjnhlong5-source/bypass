@@ -1,0 +1,442 @@
+name: Build FreeFire Offset Logger Dylib
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create source file
+        run: |
+          cat > libffoffsets.m << 'EOF'
+          #import <Foundation/Foundation.h>
+          #import <UIKit/UIKit.h>
+          #include <mach-o/dyld.h>
+          #include <stdint.h>
+
+          // ─── Free Fire iOS Offsets — HexDev-iOS ───────────────────────────────────────
+
+          // ── EventLogger / Report ──
+          static const uintptr_t OFF_LogReportCheat                    = 0x5729834;
+          static const uintptr_t OFF_LogReportCheatInHistory            = 0x572A1E8;
+          static const uintptr_t OFF_OnReportCheatClick                 = 0x5F7BADC;
+          static const uintptr_t OFF_OnMsgGroup_ShowTeamMateCheating    = 0x6E5B6A4;
+          static const uintptr_t OFF_OnReportCheatSent_Observe          = 0x1F6C298;
+          static const uintptr_t OFF_OnReportCheatSent_HudMatchResult   = 0x21B9D78;
+          static const uintptr_t OFF_OnReportCheatSent_MultiTeam        = 0x2691C48;
+          static const uintptr_t OFF_OnReportCheatSent_TeamBattle       = 0x269B3E0;
+          static const uintptr_t OFF_OnReportCheatSent_FriendAdd        = 0x27EB5D0;
+          static const uintptr_t OFF_m_CheatCodeInit                    = 0x390;
+          static const uintptr_t OFF_OnReportCheatSent_FootballLB       = 0x30E6664;
+          static const uintptr_t OFF_OnReportCheatSent_Observer         = 0x32A32D0;
+          static const uintptr_t OFF_OnReportCheatSent_SingleFight      = 0x3420200;
+          static const uintptr_t OFF_OnReportCheatSent_Lambda           = 0x38FBD7C;
+          static const uintptr_t OFF_OnReportCheatSent_BRResult         = 0x38FB6CC;
+          static const uintptr_t OFF_OnReportCheatSent_VerticalTeam     = 0x3CD7904;
+          static const uintptr_t OFF_IsCheatcodeRoom                    = 0x3E2DB8C;
+          static const uintptr_t OFF_get_PlayerPrefCheatCode            = 0x3E2FD98;
+          static const uintptr_t OFF_set_PlayerPrefCheatCode            = 0x3E2FECC;
+          static const uintptr_t OFF_CreditReportTypeCheat              = 0xD0;
+          static const uintptr_t OFF_Cheat_UIToggle                     = 0xC0;
+          static const uintptr_t OFF_cacheAttrValue_field               = 0x28;
+          static const uintptr_t OFF_StartAttribute_cacheAttrValue      = 0x8FD4294;
+
+          // ── Hack / Hacker Fields ──
+          static const uintptr_t OFF_hack_isUGCWorkshopMainScene        = 0x63;
+          static const uintptr_t OFF_hacker_account_ids                 = 0x18;
+          static const uintptr_t OFF_hacker_nicknames                   = 0x20;
+          static const uintptr_t OFF_rule_hacker_cnt                    = 0x28;
+          static const uintptr_t OFF_is_hacker_MatchmakingPlayer        = 0x38;
+          static const uintptr_t OFF_hacker_cdt_id_Matchmaking          = 0x4C;
+          static const uintptr_t OFF_hacker_tag_AccountHackerTagInfo    = 0x10;
+          static const uintptr_t OFF_hackerpool_time                    = 0x18;
+          static const uintptr_t OFF_hacker_tag_AccountMatchInfo        = 0x118;
+          static const uintptr_t OFF_hacker_cdt_id_PlayerDebug          = 0x28;
+          static const uintptr_t OFF_EDLBHACKHIA_GHDMDLOHBBN            = 0x18;
+          static const uintptr_t OFF_EDLBHACKHIA_NAJEDJPPEHG            = 0x18;
+          static const uintptr_t OFF_guild_war_hacker_punishment_Mail   = 0x140;
+          static const uintptr_t OFF_hacker_account_ids_GuildWarInfo    = 0x10;
+          static const uintptr_t OFF_hacker_nicknames_GuildWarInfo      = 0x18;
+          static const uintptr_t OFF_rule_hacker_cnt_GuildWarInfo       = 0x20;
+          static const uintptr_t OFF_hacker_type_RoomBasicInfo          = 0xE0;
+          static const uintptr_t OFF_is_anti_hack_protect               = 0x111;
+          static const uintptr_t OFF_hack_reason                        = 0x140;
+          static const uintptr_t OFF_hacker_tag_MatchStats              = 0x1B0;
+          static const uintptr_t OFF_guild_war_hacker_punishment_Clan   = 0x138;
+          static const uintptr_t OFF_anti_hack_center_desc_Res          = 0x10;
+          static const uintptr_t OFF_hack_warning_Res                   = 0x10;
+          static const uintptr_t OFF_anti_hack_center_desc_Login        = 0x1A8;
+          static const uintptr_t OFF_is_hacker_AdminDebug               = 0x2C;
+          static const uintptr_t OFF_HackerPoolCdt_cdt_type             = 0x10;
+          static const uintptr_t OFF_HackerPoolCdt_cdt_manner           = 0x14;
+          static const uintptr_t OFF_season_hacker_number               = 0x10;
+          static const uintptr_t OFF_hacker_protection                  = 0x34;
+          static const uintptr_t OFF_hacker_match_time                  = 0x68;
+          static const uintptr_t OFF_anti_hack_time                     = 0x3C;
+
+          // ── AvatarSkillData Hack ──
+          static const uintptr_t OFF_SkillCheckHackParameter_field      = 0x28;
+          static const uintptr_t OFF_get_SkillCheckHackParameter        = 0x448DA38;
+          static const uintptr_t OFF_set_SkillCheckHackParameter        = 0x448DA40;
+
+          // ── GameModeSetting / GameVarDef ──
+          static const uintptr_t OFF_EnableHitTagHackCheck              = 0xC88;
+          static const uintptr_t OFF_FFAntihackDefenceLevel             = 0x990;
+          static const uintptr_t OFF_FFAntihackLightInitOnThread        = 0x998;
+          static const uintptr_t OFF_FFANTIHACKEXT_SPLIT_THRESHOLD      = 0xC58;
+          static const uintptr_t OFF_FFAntihackEmulatorCheckDisabled    = 0x13A0;
+          static const uintptr_t OFF_FFAntihackSDKDetailEncryptBySHA1   = 0x156D;
+          static const uintptr_t OFF_EnableFFAntihackInfoExtra          = 0x1F78;
+          static const uintptr_t OFF_HackEpicClothesToMaxLevel          = 0x200F;
+          static const uintptr_t OFF_FailHackCdtId                      = 0x2C20;
+          static const uintptr_t OFF_EnableIceWallHacker                = 0x3858;
+          static const uintptr_t OFF_EnableIceWallHackerKill            = 0x3859;
+          static const uintptr_t OFF_EnableHipHackerKill                = 0x385A;
+          static const uintptr_t OFF_EnableSendHackStoreLog             = 0x385B;
+          static const uintptr_t OFF_CameraHackRuntimeCheck             = 0x3908;
+          static const uintptr_t OFF_HackGetOffVehicleWhenNull          = 0x3BDC;
+          static const uintptr_t OFF_AntiHackResetSubgameInterval       = 0x4220;
+
+          // ── ResourceIDDef ──
+          static const uintptr_t OFF_UIHUD_MATCHRESULT_ANTIHACK         = 0x1E9C;
+          static const uintptr_t OFF_HACKERSTOREPROPERTYNODE            = 0x1F6C;
+          static const uintptr_t OFF_UICOLLECTION_VEHICLE_HACKER        = 0x1F70;
+          static const uintptr_t OFF_FF_UI_HACKERSTORE_BG               = 0x1F80;
+          static const uintptr_t OFF_FF_UI_HACKERSTORE_ITEM06_A         = 0x1F94;
+          static const uintptr_t OFF_FF_UI_HACKERSTORE_ITEM03_A         = 0x1F98;
+          static const uintptr_t OFF_FF_UI_HACKERSTORE_ITEM01_A         = 0x1F9C;
+          static const uintptr_t OFF_FF_UI_HACKERSTORE_ITEM05_A         = 0x1FA0;
+          static const uintptr_t OFF_FF_UI_HACKERSTORE_ITEM02_A         = 0x1FA4;
+          static const uintptr_t OFF_FF_UI_HACKERSTORE_ITEM04_A         = 0x1FA8;
+          static const uintptr_t OFF_UIFRONTEND_HACKER_ITEMDESC         = 0x2144;
+          static const uintptr_t OFF_UIFRONTEND_HACKER_BUNDLEPREVIEW    = 0x2148;
+          static const uintptr_t OFF_UIFRONTEND_HACKER_WEAPONPANEL      = 0x214C;
+          static const uintptr_t OFF_UIFRONTEND_HACKER_VEHICLEPANEL     = 0x2150;
+          static const uintptr_t OFF_UIFRONTEND_HACKER_SKILLPANEL       = 0x2174;
+          static const uintptr_t OFF_UIANTIHACKWINDOW                   = 0x2478;
+          static const uintptr_t OFF_UIHUDHACKERDETECTED                = 0x3008;
+          static const uintptr_t OFF_UILOBBYV2_ANTIHACK_ITEM            = 0x4F08;
+          static const uintptr_t OFF_ICEWALL_HACKER                     = 0x608C;
+          static const uintptr_t OFF_SFX_HACKER_INTRO1                  = 0x8458;
+          static const uintptr_t OFF_SFX_HACKER_INTRO2                  = 0x845C;
+          static const uintptr_t OFF_SFX_HACKER_LIGHTS                  = 0x8460;
+          static const uintptr_t OFF_SFX_HACKER_ROLL                    = 0x8464;
+          static const uintptr_t OFF_SFX_HACKER_ROLL_END                = 0x8468;
+          static const uintptr_t OFF_VFX_HACKERSTORE_START_EFFECT       = 0x9A68;
+          static const uintptr_t OFF_VFX_HACKERSTORE_BOX_EFFECT         = 0x9A6C;
+          static const uintptr_t OFF_LOBBY_ANIM_HACKERGIRL_WALK         = 0xA890;
+
+          // ── Navigation / UI Controllers ──
+          static const uintptr_t OFF_GotoV2AntiHackWindow               = 0x5411AA0;
+          static const uintptr_t OFF_SendEventTypeHackClientFix         = 0x5740048;
+          static const uintptr_t OFF_NeedffantihackEmulatorCheck        = 0x59E321C;
+          static const uintptr_t OFF_m_HackerDetectedController         = 0x390;
+          static const uintptr_t OFF_ShowHackerDetectedUI               = 0x5F70D78;
+          static const uintptr_t OFF_OnGroupJoinHackerGroupNtf          = 0x6E617A4;
+          static const uintptr_t OFF_OnMsgMatchMakingCdtHackerNtf       = 0x6E674A0;
+          static const uintptr_t OFF_SetAntiHackButton                  = 0x1AFB0F4;
+          static const uintptr_t OFF_EAntiHackType_FeedbackType         = 0x10;
+          static const uintptr_t OFF_OnAntihackBtnClick                 = 0x1F6BBBC;
+          static const uintptr_t OFF_m_AntiHackCenterLockCtrl           = 0x148;
+          static const uintptr_t OFF_m_AntiHackCenterTipCtrl            = 0x160;
+          static const uintptr_t OFF_RefreshAntiHackRedPoint            = 0x206DEC4;
+          static const uintptr_t OFF_OnAntiHackCenterBtnClick           = 0x20703F0;
+          static const uintptr_t OFF_IsInAntiHackProtect                = 0x149;
+          static const uintptr_t OFF_m_HackerProtectionPoints           = 0x190;
+          static const uintptr_t OFF_InitAntiHackProtect                = 0x21A1694;
+          static const uintptr_t OFF_m_AntiHackWindowView               = 0x110;
+          static const uintptr_t OFF_m_WebViewAntiHack                  = 0x118;
+          static const uintptr_t OFF_m_AntiHackWindowModel              = 0x150;
+          static const uintptr_t OFF_ShowAntiHackWeb                    = 0x294B3AC;
+          static const uintptr_t OFF_HackNB2Transformer                 = 0x2AC7994;
+          static const uintptr_t OFF_m_IsClanHacker                     = 0x13C;
+          static const uintptr_t OFF_OnClanHackerRemindRuleBtnClick     = 0x2B41DEC;
+          static const uintptr_t OFF_RefreshClanHackerRemind            = 0x2B4253C;
+          static const uintptr_t OFF_CheckIsClanHacker                  = 0x2B428EC;
+          static const uintptr_t OFF_m_HackNB2                          = 0xE0;
+          static const uintptr_t OFF_RefreshHackView                    = 0x2B9BC24;
+          static const uintptr_t OFF_OnHackBtnClick_Action              = 0x2F90810;
+          static const uintptr_t OFF_OnHackBtnRelease_Action            = 0x2F908E4;
+          static const uintptr_t OFF_OnHackBtnClick_Driver              = 0x3107518;
+          static const uintptr_t OFF_OnHackBtnRelease_Driver            = 0x31075E4;
+          static const uintptr_t OFF_OnHackBtnClick_Passenger           = 0x31083EC;
+          static const uintptr_t OFF_OnHackBtnRelease_Passenger         = 0x31084B8;
+          static const uintptr_t OFF_4this_HackerDetected_1             = 0x20;
+          static const uintptr_t OFF_4this_HackerDetected_2             = 0x20;
+          static const uintptr_t OFF_m_HackerDetectedView               = 0x98;
+          static const uintptr_t OFF_SetDelayCloseAction                = 0x312B714;
+          static const uintptr_t OFF_m_AntiHackItemView                 = 0xB8;
+          static const uintptr_t OFF_m_FeedbackInfo                     = 0xC0;
+          static const uintptr_t OFF_ClearAntiHackReportFeedbackRedDots = 0x36DBE9C;
+          static const uintptr_t OFF_isReportHack_field                 = 0x28;
+          static const uintptr_t OFF_tReasonTableReposition             = 0x3729790;
+          static const uintptr_t OFF_HackTestAddBpExp                   = 0x374B0F8;
+          static const uintptr_t OFF_PreviewNB2HackTransformer          = 0x38C6C6C;
+          static const uintptr_t OFF_SetDesc_HackWarning                = 0x3ABB354;
+          static const uintptr_t OFF_HackShowNB2Transformer             = 0x3D75700;
+          static const uintptr_t OFF_m_UIView_BundlePreview             = 0xE0;
+          static const uintptr_t OFF_m_UIView_SkillInfoPanel            = 0xE0;
+          static const uintptr_t OFF_m_UIView_ItemDesc                  = 0x140;
+          static const uintptr_t OFF_m_UIView_VehiclePanel              = 0xC8;
+          static const uintptr_t OFF_m_UIView_WeaponPanel               = 0x100;
+          static const uintptr_t OFF_COLOR_HACKERSTORE_BG               = 0xE8;
+
+          // ── CollectionDataManager ──
+          static const uintptr_t OFF_m_DicItemIdToHackProperty          = 0x170;
+          static const uintptr_t OFF_m_DicPveItemIdToHackProperty       = 0x178;
+          static const uintptr_t OFF_m_DicWeaponIdToHackProperty        = 0x180;
+          static const uintptr_t OFF_ProcessHackSkinProperty            = 0x3F8856C;
+          static const uintptr_t OFF_ProcessHackProperty_WeaponSkin     = 0x3F88618;
+          static const uintptr_t OFF_ProcessHackProperty_Weapon         = 0x3F88A4C;
+          static const uintptr_t OFF_GetHackProperty                    = 0x3F88F00;
+          static const uintptr_t OFF_GetPveHackProperty                 = 0x3F89048;
+          static const uintptr_t OFF_GetWeaponHackProperty              = 0x3F89190;
+
+          // ── GachaLimitInfoData / GachaTurntableInfoData ──
+          static const uintptr_t OFF_UpdateHackerStoreSuperGrandPrize_Lambda = 0x405B318;
+          static const uintptr_t OFF_UpdateHackerStoreSuperGrandPrize    = 0x405AF14;
+          static const uintptr_t OFF_RULE_CHEST_HACKER_STORE_HELP_TAB    = 0x40;
+          static const uintptr_t OFF_RULE_CHEST_HACKER_STORE_HELP_DESC   = 0x48;
+
+          // ── UIModelAntiHackWindow ──
+          static const uintptr_t OFF_m_AntiHackCenterUrl                 = 0x20;
+          static const uintptr_t OFF_GetAntiHackCenterUrl                = 0x40D9AFC;
+          static const uintptr_t OFF_ProcessAntiHackCenterDesc           = 0x40D9C24;
+
+          // ── UIModelClan ──
+          static const uintptr_t OFF_OnReceiveClanGuildWarHackerNtf      = 0x41BF9F0;
+          static const uintptr_t OFF_GetClanHackerRemindDetail           = 0x41CDE00;
+          static const uintptr_t OFF_m_ClanWarHackerPunishment           = 0x130;
+
+          // ── UIModelCredit ──
+          static const uintptr_t OFF_AntiHackNeedRedPoint                = 0x424FB5C;
+          static const uintptr_t OFF_ClearAllAntiHackRedPoints           = 0x424FBE4;
+
+          // ── UIModelGacha ──
+          static const uintptr_t OFF_SortHackerStoreShowItem_Lambda0     = 0x4305500;
+          static const uintptr_t OFF_SortHackerStoreShowItem_Lambda1     = 0x4305548;
+          static const uintptr_t OFF_GethackerStoreShowItemInfo_Lambda   = 0x4305598;
+          static const uintptr_t OFF_SelectHackerStoreLimitedChest_CB    = 0x430572C;
+          static const uintptr_t OFF_m_hackerStoreInfo                   = 0x90;
+          static const uintptr_t OFF_m_hackerStoreShowItemIDs            = 0x98;
+          static const uintptr_t OFF_m_hackerStoreCacheRewardID          = 0xA0;
+          static const uintptr_t OFF_SortHackerStoreShowItem             = 0x42DC8D4;
+          static const uintptr_t OFF_GethackerStoreShowItemInfo          = 0x42DCCA0;
+          static const uintptr_t OFF_GetHackerStorePurchasedAnimIndexes  = 0x42DD680;
+          static const uintptr_t OFF_GetHackerStorePurchaseCnt           = 0x42DDACC;
+          static const uintptr_t OFF_GetCacheHackerStoreLastGetID        = 0x42DD8FC;
+          static const uintptr_t OFF_CacheHackerStoreLastGetID           = 0x42DDC4C;
+          static const uintptr_t OFF_RefreshHackerStoreShowItems         = 0x42DDD54;
+          static const uintptr_t OFF_RefreshHackerStoreSuperGrandPrize   = 0x42DDF18;
+          static const uintptr_t OFF_UpdateHackerStoreShowItemState      = 0x42DE140;
+          static const uintptr_t OFF_RefreshHackerStoreShowItemsBySelect = 0x42DE29C;
+          static const uintptr_t OFF_IsPurchasedForHackerStore           = 0x42DE554;
+          static const uintptr_t OFF_IsAllPurchasedForHackerStore        = 0x42DE6C8;
+          static const uintptr_t OFF_RequestHackerStoreInfo              = 0x42DEC98;
+          static const uintptr_t OFF_SelectHackerStoreLimitedChestPrize  = 0x42DEEA0;
+          static const uintptr_t OFF_IsHackerStoreSelected               = 0x42DF16C;
+          static const uintptr_t OFF_GetHackerStoreShowItemIDs           = 0x42DD9C0;
+          static const uintptr_t OFF_GetHackerStoreSelectPageItem1       = 0x42DF250;
+          static const uintptr_t OFF_GetHackerStoreSelectPageItem2       = 0x42DF5D4;
+          static const uintptr_t OFF_HackConsumeTypeForBackEnd           = 0x42EA3DC;
+          static const uintptr_t OFF_RequestHackerStoreInfo_CB           = 0x42F7E5C;
+
+          // ── UIModelLogin ──
+          static const uintptr_t OFF_ffantihackGPPProcessed              = 0x27;
+          static const uintptr_t OFF_ffantihackEnabled                   = 0x128;
+          static const uintptr_t OFF_ffantihackHPEEnabled                = 0x129;
+          static const uintptr_t OFF_ProcessffantihackOpen               = 0x44A9378;
+          static const uintptr_t OFF_GetffantihackEnabled                = 0x44B49DC;
+          static const uintptr_t OFF_GetEffectiveffantihackEnabled       = 0x44B4A34;
+          static const uintptr_t OFF_GetffantihackEnabledTempValue       = 0x44A78C8;
+          static const uintptr_t OFF_ProcessffantihackGGP                = 0x44AFCA8;
+
+          // ── UIModelReplay ──
+          static const uintptr_t OFF_SortByHackerProb_Lambda            = 0x4698A48;
+          static const uintptr_t OFF_SortByHackerProb                   = 0x469811C;
+          static const uintptr_t OFF_ExistHacker                        = 0x469885C;
+          static const uintptr_t OFF_hacker_prob                        = 0x18;
+          static const uintptr_t OFF_is_hacker_AIReplay                 = 0x20;
+          static const uintptr_t OFF_hacker_cdt_id_ReportReview         = 0x40;
+          static const uintptr_t OFF_hacker_tag_ReportReview            = 0x44;
+          static const uintptr_t OFF_is_hacker_ReportReview             = 0x50;
+          static const uintptr_t OFF_SendHackerReportRequest_CB         = 0x469AF60;
+          static const uintptr_t OFF_SendHackerReportRequest            = 0x469A6BC;
+
+          // ── UIModelSkinModCheck ──
+          static const uintptr_t OFF_isHacker_SkinModCheck              = 0x1C;
+          static const uintptr_t OFF_m_HackWarningInfoDesc              = 0x20;
+          static const uintptr_t OFF_RequestHackerWarningInfo           = 0x4727C10;
+          static const uintptr_t OFF_OnRequestCheckHackBehaviorRes      = 0x47280F0;
+          static const uintptr_t OFF_RequestHackerWarningInfo_CB        = 0x47286B8;
+
+          // ── GachaRuleMapping ──
+          static const uintptr_t OFF_RULE_GACHA_HACKER_STORE_HELP_TAB  = 0x40;
+          static const uintptr_t OFF_RULE_GACHA_HACKER_STORE_HELP_DESC = 0x48;
+
+          // ── UIAntiHackWindowView ──
+          static const uintptr_t OFF_AntiHackContainer_View            = 0x88;
+          static const uintptr_t OFF_LabelAntiHack                     = 0x90;
+
+          // ── UIClanMainPageView ──
+          static const uintptr_t OFF_ClanHackerRemindContainer         = 0x298;
+          static const uintptr_t OFF_ClanHackerRemindLabel             = 0x2A0;
+          static const uintptr_t OFF_ClanHackerRemindRuleBtn           = 0x2A8;
+
+          // ── UIGacha Views ──
+          static const uintptr_t OFF_HackerStoreBox_Ichis              = 0x98;
+          static const uintptr_t OFF_HackerStoreBox_Confirm            = 0x98;
+
+          // ── Match Result Views ──
+          static const uintptr_t OFF_AntiHackProtectTipContainer       = 0x138;
+          static const uintptr_t OFF_AntiHackContainer_LadderResult    = 0x110;
+
+          // ── Lobby Views ──
+          static const uintptr_t OFF_AntihackBtn                       = 0xE0;
+          static const uintptr_t OFF_AntiHackCenterBtn                 = 0xA8;
+          static const uintptr_t OFF_AntiHackCenterLock                = 0x168;
+          static const uintptr_t OFF_AntiHackCenterLockTransForm       = 0x170;
+          static const uintptr_t OFF_AntiHackTips                      = 0x1A8;
+
+          // ── UIReportReplayItemView ──
+          static const uintptr_t OFF_HackTag                           = 0x100;
+
+          // ── GameConfig ──
+          static const uintptr_t OFF_debugHack                         = 0x18B;
+          static const uintptr_t OFF_checkHacker_field                 = 0x18D;
+          static const uintptr_t OFF_DebugHack_static                  = 0xE8;
+          static const uintptr_t OFF_get_CheckHacker                   = 0x4E6DFA4;
+
+          // ── UGCResourceForGameData ──
+          static const uintptr_t OFF_HackedIsStdLibraryPackage         = 0x521AE04;
+
+          // ── Obfuscated Hacker Methods ──
+          static const uintptr_t OFF_HFMCBHACKJL                       = 0x567921C;
+          static const uintptr_t OFF_HFGAFHACKOL                       = 0x56B2FA4;
+          static const uintptr_t OFF_EPHACKPBHLE                       = 0x18;
+          static const uintptr_t OFF_MHACKKIBMNN                       = 0x30;
+          static const uintptr_t OFF_HEFJHACKDGD                       = 0x68;
+
+          // ── DataSet ──
+          static const uintptr_t OFF_OnRemoveRelationHack               = 0x8DBDBE0;
+
+          // ── Report Player ──
+          static const uintptr_t OFF_QuickReportPlayer_CB               = 0x216139C;
+          static const uintptr_t OFF_IsQuickReportPlayerAlreadyReported = 0x2160980;
+          static const uintptr_t OFF_QuickReportPlayer                  = 0x2160BAC;
+          static const uintptr_t OFF_ReportPlayer_Lambda_ReplayMatch    = 0x339C408;
+          static const uintptr_t OFF_ReportPlayer_HudReport             = 0x33991AC;
+          static const uintptr_t OFF_ReportPlayer_HudReport_CB          = 0x339C378;
+          static const uintptr_t OFF_ReportPlayer_Lambda_MainReason     = 0x33A633C;
+          static const uintptr_t OFF_ReportPlayer_HudReportNew          = 0x33A2314;
+          static const uintptr_t OFF_ReportPlayer_HudReportNew_CB       = 0x33A62AC;
+          static const uintptr_t OFF_CreateReportPlayer_CB              = 0x3E5F8D8;
+          static const uintptr_t OFF_CreateReportPlayerInUGCGame_CB     = 0x3E5FBBC;
+          static const uintptr_t OFF_CreateReportPlayer                 = 0x3E58B64;
+          static const uintptr_t OFF_CreateReportPlayerInUGCGame        = 0x3E58D3C;
+          static const uintptr_t OFF_HasReportPlayer                    = 0x4801148;
+          static const uintptr_t OFF_UnreportPlayer_View                = 0x298;
+          static const uintptr_t OFF_ReportPlayerEasyList               = 0x118;
+          static const uintptr_t OFF_ReportPlayerExcludeTitle           = 0x128;
+
+          // ── Checksum / MD2 / Encoding ──
+          static const uintptr_t OFF_checksum_INameTransform            = 0x10;
+          static const uintptr_t OFF_sources_ItemCheck                  = 0x10;
+          static const uintptr_t OFF_m_ItemSourcesDict                  = 0x1C8;
+          static const uintptr_t OFF_CompareItemCheckSummaryDesc        = 0x43DBE1C;
+          static const uintptr_t OFF_CompareItemCheckSummaryDescSort    = 0x43DC660;
+          static const uintptr_t OFF_CompareTokenCheckSummaryDesc       = 0x43DCCF4;
+          static const uintptr_t OFF_checksum_MD2Managed_36413          = 0x30;
+          static const uintptr_t OFF_MD2Transform_36413                 = 0x892F510;
+          static const uintptr_t OFF_Checksum_Nullable_field            = 0x50;
+          static const uintptr_t OFF_get_Checksum_Nullable              = 0x95D1C3C;
+          static const uintptr_t OFF_Checksum_int_field                 = 0x50;
+          static const uintptr_t OFF_get_Checksum_int                   = 0x95D2D3C;
+          static const uintptr_t OFF_set_Checksum_int                   = 0x95D2D44;
+          static const uintptr_t OFF_produceResult_PDF417               = 0x95EE4BC;
+          static const uintptr_t OFF_addPattern_PDF417                  = 0x95EF244;
+          static const uintptr_t OFF_checkChecksums_PDF417              = 0x95F2200;
+          static const uintptr_t OFF_checkOneChecksum_PDF417            = 0x95F2518;
+          static const uintptr_t OFF_computeChecksumIndex_Code93        = 0x95F3168;
+          static const uintptr_t OFF_CalculateChecksumLuhn              = 0x95FD4A4;
+          static const uintptr_t OFF_extensionChecksum                  = 0x9607600;
+          static const uintptr_t OFF_checkChecksum_UPCA_virtual         = 0x9608E00;
+          static const uintptr_t OFF_checkStandardUPCEANChecksum        = 0x95F4ED0;
+          static const uintptr_t OFF_getStandardUPCEANChecksum          = 0x95F4CE8;
+          static const uintptr_t OFF_checkChecksum_UPCA_override        = 0x9609B10;
+          static const uintptr_t OFF_ChecksumPortion_field              = 0x14;
+          static const uintptr_t OFF_get_ChecksumPortion                = 0x960B068;
+          static const uintptr_t OFF_set_ChecksumPortion                = 0x960B070;
+          static const uintptr_t OFF_ctor_DataChar_value                = 0x960B078;
+          static const uintptr_t OFF_ctor_DataChar_finder               = 0x960B484;
+          static const uintptr_t OFF_checkChecksum_Pair                 = 0x960BE2C;
+          static const uintptr_t OFF_checkChecksum_DataChar             = 0x960F140;
+          static const uintptr_t OFF_checksum_MD2Managed_44159          = 0x30;
+          static const uintptr_t OFF_MD2Transform_44159                 = 0x89052DC;
+
+          // ─── Runtime Offset Logger ────────────────────────────────────────────────────
+
+          static uintptr_t getBase() {
+              for (uint32_t i = 0; i < _dyld_image_count(); i++) {
+                  const char *name = _dyld_get_image_name(i);
+                  if (name && strstr(name, "FFCM")) {
+                      return (uintptr_t)_dyld_get_image_vmaddr_slide(i);
+                  }
+              }
+              return 0;
+          }
+
+          __attribute__((constructor))
+          static void init() {
+              dispatch_async(dispatch_get_main_queue(), ^{
+                  uintptr_t base = getBase();
+                  NSLog(@"[HexDev] ✅ Base Address: 0x%lx", base);
+
+                  // spot-check a few resolved addresses at runtime
+                  NSLog(@"[HexDev] LogReportCheat       -> 0x%lx", base + OFF_LogReportCheat);
+                  NSLog(@"[HexDev] IsCheatcodeRoom      -> 0x%lx", base + OFF_IsCheatcodeRoom);
+                  NSLog(@"[HexDev] GetffantihackEnabled -> 0x%lx", base + OFF_GetffantihackEnabled);
+                  NSLog(@"[HexDev] SendHackerReport     -> 0x%lx", base + OFF_SendHackerReportRequest);
+                  NSLog(@"[HexDev] RequestHackerStore   -> 0x%lx", base + OFF_RequestHackerStoreInfo);
+                  NSLog(@"[HexDev] ShowHackerDetectedUI -> 0x%lx", base + OFF_ShowHackerDetectedUI);
+                  NSLog(@"[HexDev] ExistHacker          -> 0x%lx", base + OFF_ExistHacker);
+                  NSLog(@"[HexDev] get_CheckHacker      -> 0x%lx", base + OFF_get_CheckHacker);
+                  NSLog(@"[HexDev] HFMCBHACKJL (obf)   -> 0x%lx", base + OFF_HFMCBHACKJL);
+                  NSLog(@"[HexDev] MD2Transform (36413) -> 0x%lx", base + OFF_MD2Transform_36413);
+                  NSLog(@"[HexDev] ✅ Tất cả offset đã resolve — HexDev-iOS");
+              });
+          }
+          EOF
+
+      - name: Compile dylib
+        run: |
+          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          clang -dynamiclib \
+                -framework Foundation \
+                -framework UIKit \
+                -arch arm64 \
+                -isysroot $SDK_PATH \
+                -o libffoffsets.dylib libffoffsets.m
+
+      - name: Upload dylib artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libffoffsets.dylib
+          path: libffoffsets.dylib
+
+      - name: Download insert_dylib tool
+        run: |
+          curl -L -o insert_dylib https://github.com/tyilo/insert_dylib/releases/download/1.7.0/insert_dylib
+          chmod +x insert_dylib
+
+      - name: Upload insert_dylib artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: insert_dylib
+          path: insert_dylib
