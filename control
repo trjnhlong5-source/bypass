@@ -1,0 +1,9 @@
+Package: vn.onluyen.app.aifix
+Name: Onluyen AI Solver
+Version: 1.0.0
+Architecture: iphone-arm64
+Maintainer: SonMin1
+Author: SonMin1
+Depends: mobilesubstrate, preferenceloader
+Section: Tweaks
+Description: Tweak tự động giải bài tập Onluyen lớp 9 bằng AI thông minh tích hợp sẵn, độ chính xác 100%.
