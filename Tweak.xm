@@ -175,7 +175,55 @@
     return result;
 }
 
-result;
+- (void)askGemini:(NSString *)prompt
+       completion:(void(^)(NSString *answer, NSError *err))completion {
+
+    NSString *urlStr = [NSString stringWithFormat:
+        @"https://generativelanguage.googleapis.com/v1beta/models/"
+        @"gemini-1.5-flash:generateContent?key=%@", OL_GEMINI_KEY];
+
+    NSDictionary *body = @{
+        @"contents": @[@{ @"parts": @[@{ @"text": prompt }] }],
+        @"generationConfig": @{ @"temperature": @0.1, @"maxOutputTokens": @300 }
+    };
+
+    NSData *bodyData = [NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:
+        [NSURL URLWithString:urlStr]
+        cachePolicy:NSURLRequestUseProtocolCachePolicy
+        timeoutInterval:15.0];
+    req.HTTPMethod = @"POST";
+    [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    req.HTTPBody = bodyData;
+
+    [[[NSURLSession sharedSession] dataTaskWithRequest:req
+        completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
+        if (err) {
+            dispatch_async(dispatch_get_main_queue(), ^{ completion(nil, err); });
+            return;
+        }
+
+        NSString *rawStr = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+        NSLog(@"[OLSolver] Raw: %@", rawStr);
+
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+
+        if (json[@"error"]) {
+            NSString *msg = json[@"error"][@"message"] ?: @"API error";
+            dispatch_async(dispatch_get_main_queue(), ^{
+                completion([NSString stringWithFormat:@"❌ API: %@", msg], nil);
+            });
+            return;
+        }
+
+        NSString *text = nil;
+        @try { text = json[@"candidates"][0][@"content"][@"parts"][0][@"text"]; }
+        @catch (NSException *e) {}
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            completion(text ?: rawStr, nil);
+        });
+    }] resume];
 }
 
 - (void)runScan {
