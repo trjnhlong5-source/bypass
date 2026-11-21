@@ -4,19 +4,15 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-// ══════════════════════════════════════════════════════
-// ⚙️  CẤU HÌNH — điền API key Gemini miễn phí vào đây
-//    Lấy key tại: https://aistudio.google.com/apikey
-// ══════════════════════════════════════════════════════
-#define OL_GEMINI_KEY @"AQ.Ab8RN6LjPA5SFO35Ve5Y7vUr8_DRs8aULzEAuzHxy3VIPqtLDQ"
-
-// ─── Manager ──────────────────────────────────────────────────────────────
+#define OL_GEMINI_KEY @"AQ.Ab8RN6KWdkZha6d9jL6tUL4VDYnjc9kaQ_VaF8p1xewJgxFX8g"
 
 @interface OLSolverManager : NSObject
 + (instancetype)shared;
 - (void)ensureButtonExists;
 - (void)runScan;
 - (void)handlePan:(UIPanGestureRecognizer *)g;
+- (UIViewController *)frontmostVC;
+- (UIWindow *)activeWindow;
 @end
 
 @implementation OLSolverManager {
@@ -63,8 +59,6 @@
     return vc;
 }
 
-// ─── Tạo nút nổi ─────────────────────────────────────────────────────────
-
 - (void)ensureButtonExists {
     dispatch_async(dispatch_get_main_queue(), ^{
         UIWindow *win = [self activeWindow];
@@ -89,6 +83,7 @@
             initWithTarget:self action:@selector(handlePan:)];
         [_floatBtn addGestureRecognizer:pan];
         [win addSubview:_floatBtn];
+        NSLog(@"[OLSolver] ✅ Nút đã tạo xong");
     });
 }
 
@@ -103,72 +98,52 @@
     [g setTranslation:CGPointZero inView:p];
 }
 
-// ─── Quét view hierarchy — lấy text theo vị trí màn hình ─────────────────
-
 - (void)scanView:(UIView *)view
           result:(NSMutableOrderedSet<NSString *> *)result
-            minY:(CGFloat)minY   // bỏ qua mọi thứ trên navigation bar
+            minY:(CGFloat)minY
            depth:(NSInteger)depth {
-
     if (!view || depth > 60) return;
     if (view.isHidden || view.alpha < 0.01f) return;
     if (view.tag == 0xAB0CD) return;
 
-    // Tọa độ trong cửa sổ
     CGRect frameInWin = [view convertRect:view.bounds toView:nil];
-
-    // Bỏ qua vùng nav bar (top)
     if (CGRectGetMaxY(frameInWin) < minY) {
-        // Vẫn đào sâu subviews — scroll view có thể bắt đầu cao hơn content
         for (UIView *sub in view.subviews)
             [self scanView:sub result:result minY:minY depth:depth+1];
         return;
     }
 
-    // ── Thử mọi cách lấy text ──────────────────────────────────────────
-
     NSMutableArray<NSString *> *candidates = [NSMutableArray array];
 
-    // 1. UILabel
     if ([view isKindOfClass:[UILabel class]])
         [candidates addObject:((UILabel *)view).text ?: @""];
-
-    // 2. UITextView
     if ([view isKindOfClass:[UITextView class]])
         [candidates addObject:((UITextView *)view).text ?: @""];
-
-    // 3. UIButton title
     if ([view isKindOfClass:[UIButton class]]) {
         NSString *t = [(UIButton *)view titleForState:UIControlStateNormal];
         if (t) [candidates addObject:t];
     }
-
-    // 4. accessibilityLabel (React Native set cái này)
     if (view.accessibilityLabel.length > 0)
         [candidates addObject:view.accessibilityLabel];
 
-    // 5. KVC "text" — bắt RCTTextView, custom views
     @try {
         id val = [view valueForKey:@"text"];
         if ([val isKindOfClass:[NSString class]] && [(NSString *)val length] > 0)
             [candidates addObject:(NSString *)val];
     } @catch (NSException *e) {}
 
-    // 6. attributedText → plain string
     @try {
         id attr = [view valueForKey:@"attributedText"];
         if ([attr isKindOfClass:[NSAttributedString class]])
             [candidates addObject:[(NSAttributedString *)attr string]];
     } @catch (NSException *e) {}
 
-    // 7. NSTextStorage (một số RCT version)
     @try {
         id storage = [view valueForKey:@"textStorage"];
         if ([storage isKindOfClass:[NSTextStorage class]])
             [candidates addObject:[(NSTextStorage *)storage string]];
     } @catch (NSException *e) {}
 
-    // ── Lọc và thêm vào kết quả ───────────────────────────────────────
     for (NSString *raw in candidates) {
         NSString *t = [raw stringByTrimmingCharactersInSet:
                         NSCharacterSet.whitespaceAndNewlineCharacterSet];
@@ -180,26 +155,19 @@
         [self scanView:sub result:result minY:minY depth:depth+1];
 }
 
-// ─── Lọc rác sau khi quét ────────────────────────────────────────────────
-
 - (NSArray<NSString *> *)filterTexts:(NSMutableOrderedSet<NSString *> *)raw {
-    // Những chuỗi thuộc về chrome của app, bỏ qua
     NSSet *skip = [NSSet setWithArray:@[
-        @"BỎ QUA", @"Nộp bài", @"Nộp", @"OK", @"Cancel", @"Back",
-        @"✕ Đóng", @"🤖", @"<", @">"
+        @"BỎ QUA", @"Nộp bài", @"Nộp", @"OK", @"Cancel",
+        @"Back", @"✕ Đóng", @"🤖", @"<", @">"
     ]];
-
     NSMutableArray *result = [NSMutableArray array];
     NSMutableSet   *seen   = [NSMutableSet set];
-
     for (NSString *t in raw) {
         if ([skip containsObject:t]) continue;
-        // Bỏ chuỗi chỉ toàn số + khoảng trắng (số trang, ID)
         NSString *stripped = [[t componentsSeparatedByCharactersInSet:
             [NSCharacterSet characterSetWithCharactersInString:@" 0123456789"]]
             componentsJoinedByString:@""];
         if (stripped.length == 0) continue;
-        // Bỏ trùng
         if ([seen containsObject:t]) continue;
         [seen addObject:t];
         [result addObject:t];
@@ -207,46 +175,21 @@
     return result;
 }
 
-// ─── Gọi Gemini API để lấy đáp án ───────────────────────────────────────
-
 - (void)askGemini:(NSString *)prompt
        completion:(void(^)(NSString *answer, NSError *err))completion {
 
-    NSString *key = OL_GEMINI_KEY;
-    if (!key.length || [key isEqualToString:@"AQ.Ab8RN6LjPA5SFO35Ve5Y7vUr8_DRs8aULzEAuzHxy3VIPqtLDQ"]) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (completion) {
-                completion(@"⚙️ Chưa cấu hình API key. Hãy thay AQ.Ab8RN6LjPA5SFO35Ve5Y7vUr8_DRs8aULzEAuzHxy3VIPqtLDQ bằng key AIza... trong Tweak.xm.", nil);
-            }
-        });
-        return;
-    }
-
     NSString *urlStr = [NSString stringWithFormat:
         @"https://generativelanguage.googleapis.com/v1beta/models/"
-        @"gemini-2.0-flash:generateContent?key=%@", key];
+        @"gemini-2.0-flash:generateContent?key=%@", OL_GEMINI_KEY];
 
     NSDictionary *body = @{
-        @"contents": @[@{
-            @"parts": @[@{ @"text": prompt ?: @"" }]
-        }],
-        @"generationConfig": @{
-            @"temperature": @0.1,
-            @"maxOutputTokens": @200
-        }
+        @"contents": @[@{ @"parts": @[@{ @"text": prompt }] }],
+        @"generationConfig": @{ @"temperature": @0.1, @"maxOutputTokens": @300 }
     };
 
-    NSError *jsonErr = nil;
-    NSData *bodyData = [NSJSONSerialization dataWithJSONObject:body options:0 error:&jsonErr];
-    if (jsonErr || !bodyData) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (completion) completion(nil, jsonErr);
-        });
-        return;
-    }
-
-    NSURL *url = [NSURL URLWithString:urlStr];
-    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url
+    NSData *bodyData = [NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:
+        [NSURL URLWithString:urlStr]
         cachePolicy:NSURLRequestUseProtocolCachePolicy
         timeoutInterval:15.0];
     req.HTTPMethod = @"POST";
@@ -254,69 +197,27 @@
     req.HTTPBody = bodyData;
 
     [[[NSURLSession sharedSession] dataTaskWithRequest:req
-        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-
-        if (error) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (completion) completion(nil, error);
-            });
+        completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
+        if (err) {
+            dispatch_async(dispatch_get_main_queue(), ^{ completion(nil, err); });
             return;
         }
-
-        if (!data) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (completion) completion(@"Không nhận được dữ liệu từ Gemini.", nil);
-            });
-            return;
-        }
-
-        NSError *parseErr = nil;
-        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&parseErr];
-        if (parseErr || ![json isKindOfClass:[NSDictionary class]]) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (completion) completion(nil, parseErr);
-            });
-            return;
-        }
-
-        if (json[@"error"]) {
-            NSString *errMsg = json[@"error"][@"message"] ?: @"Lỗi từ Gemini API";
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (completion) completion([NSString stringWithFormat:@"❌ %@", errMsg], nil);
-            });
-            return;
-        }
-
-        NSString *text = nil;
-        NSArray *candidates = json[@"candidates"];
-        if ([candidates isKindOfClass:[NSArray class]] && candidates.count > 0) {
-            NSDictionary *content = candidates.firstObject[@"content"];
-            NSArray *parts = content[@"parts"];
-            if ([parts isKindOfClass:[NSArray class]] && parts.count > 0) {
-                text = parts.firstObject[@"text"];
-            }
-        }
-
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        NSString *text = json[@"candidates"][0][@"content"][@"parts"][0][@"text"];
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (completion) {
-                completion(text ?: @"Không parse được phản hồi.", nil);
-            }
+            completion(text ?: @"Không parse được phản hồi.", nil);
         });
-
     }] resume];
 }
 
-// ─── Bấm nút → quét → gọi AI → hiện kết quả ─────────────────────────────
-
 - (void)runScan {
-    UIViewController *topVC   = [self frontmostVC];
-    UIWindow         *win     = [self activeWindow];
+    UIViewController *topVC = [self frontmostVC];
+    UIWindow *win = [self activeWindow];
 
-    // Tính ngưỡng Y của content area (bỏ nav bar ~110pt)
-    CGFloat navHeight = topVC.navigationController
-        ? topVC.navigationController.navigationBar.frame.size.height
-          + [UIApplication sharedApplication].statusBarFrame.size.height
-        : 110.0;
+    CGFloat navHeight = 110.0;
+    if (topVC.navigationController)
+        navHeight = topVC.navigationController.navigationBar.frame.size.height
+                  + UIApplication.sharedApplication.statusBarFrame.size.height;
 
     NSMutableOrderedSet<NSString *> *raw = [NSMutableOrderedSet orderedSet];
     [self scanView:win result:raw minY:navHeight depth:0];
@@ -334,36 +235,26 @@
         return;
     }
 
-    // Hiện loading
     UIAlertController *loading = [UIAlertController
         alertControllerWithTitle:@"🤖 Đang phân tích..."
-        message:@"AI đang xử lý câu hỏi\n⏳"
+        message:@"AI đang xử lý câu hỏi ⏳"
         preferredStyle:UIAlertControllerStyleAlert];
     [topVC presentViewController:loading animated:YES completion:nil];
 
-    // Build prompt
     NSString *content = [texts componentsJoinedByString:@"\n"];
     NSString *prompt = [NSString stringWithFormat:
-        @"Đây là nội dung màn hình câu hỏi trắc nghiệm từ app Onluyen (học sinh lớp 9 Việt Nam):\n\n"
-        @"%@\n\n"
+        @"Đây là nội dung màn hình câu hỏi trắc nghiệm từ app Onluyen (học sinh lớp 9 Việt Nam):\n\n%@\n\n"
         @"Hãy:\n"
-        @"1. Xác định câu hỏi chính xác\n"
-        @"2. Liệt kê các lựa chọn A, B, C, D nếu có\n"
-        @"3. Chỉ ra đáp án đúng và giải thích ngắn gọn (1-2 câu)\n"
-        @"Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng.",
-        content];
+        @"1. Xác định câu hỏi chính\n"
+        @"2. Liệt kê các lựa chọn A, B, C, D\n"
+        @"3. Chỉ ra đáp án đúng và giải thích ngắn gọn 1-2 câu\n"
+        @"Trả lời bằng tiếng Việt, ngắn gọn.", content];
 
     [self askGemini:prompt completion:^(NSString *answer, NSError *err) {
-
         [loading dismissViewControllerAnimated:NO completion:^{
-
-            NSString *msg;
-            if (err) {
-                msg = [NSString stringWithFormat:@"❌ Lỗi API:\n%@", err.localizedDescription];
-            } else {
-                msg = answer;
-            }
-
+            NSString *msg = err
+                ? [NSString stringWithFormat:@"❌ Lỗi: %@", err.localizedDescription]
+                : answer;
             UIAlertController *result = [UIAlertController
                 alertControllerWithTitle:@"🤖 OL Solver — Đáp án"
                 message:msg
@@ -376,8 +267,6 @@
 }
 
 @end
-
-// ─── Hooks ────────────────────────────────────────────────────────────────
 
 %hook UIViewController
 - (void)viewDidAppear:(BOOL)animated {
