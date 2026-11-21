@@ -107,8 +107,8 @@
 
 - (void)scanView:(UIView *)view
           result:(NSMutableOrderedSet<NSString *> *)result
-         minY:(CGFloat)minY   // bỏ qua mọi thứ trên navigation bar
-          depth:(NSInteger)depth {
+            minY:(CGFloat)minY   // bỏ qua mọi thứ trên navigation bar
+           depth:(NSInteger)depth {
 
     if (!view || depth > 60) return;
     if (view.isHidden || view.alpha < 0.01f) return;
@@ -213,8 +213,12 @@
        completion:(void(^)(NSString *answer, NSError *err))completion {
 
     NSString *key = OL_GEMINI_KEY;
-    if ([key hasPrefix:@"AQ.Ab8RN6LjPA5SFO35Ve5Y7vUr8_DRs8aULzEAuzHxy3VIPqtLDQ"]) {
-        completion(@"⚙️ Chưa cấu hình API key. Xem hướng dẫn trong file Tweak.xm.", nil);
+    if (!key.length || [key isEqualToString:@"AQ.Ab8RN6LjPA5SFO35Ve5Y7vUr8_DRs8aULzEAuzHxy3VIPqtLDQ"]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) {
+                completion(@"⚙️ Chưa cấu hình API key. Hãy thay AQ.Ab8RN6LjPA5SFO35Ve5Y7vUr8_DRs8aULzEAuzHxy3VIPqtLDQ bằng key AIza... trong Tweak.xm.", nil);
+            }
+        });
         return;
     }
 
@@ -224,7 +228,7 @@
 
     NSDictionary *body = @{
         @"contents": @[@{
-            @"parts": @[@{ @"text": prompt }]
+            @"parts": @[@{ @"text": prompt ?: @"" }]
         }],
         @"generationConfig": @{
             @"temperature": @0.1,
@@ -232,10 +236,17 @@
         }
     };
 
-    NSData *bodyData = [NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
+    NSError *jsonErr = nil;
+    NSData *bodyData = [NSJSONSerialization dataWithJSONObject:body options:0 error:&jsonErr];
+    if (jsonErr || !bodyData) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) completion(nil, jsonErr);
+        });
+        return;
+    }
 
-    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:
-        [NSURL URLWithString:urlStr]
+    NSURL *url = [NSURL URLWithString:urlStr];
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url
         cachePolicy:NSURLRequestUseProtocolCachePolicy
         timeoutInterval:15.0];
     req.HTTPMethod = @"POST";
@@ -245,13 +256,51 @@
     [[[NSURLSession sharedSession] dataTaskWithRequest:req
         completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
 
-        if (error) { completion(nil, error); return; }
+        if (error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) completion(nil, error);
+            });
+            return;
+        }
 
-        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-        NSString *text = json[@"candidates"][0][@"content"][@"parts"][0][@"text"];
+        if (!data) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) completion(@"Không nhận được dữ liệu từ Gemini.", nil);
+            });
+            return;
+        }
+
+        NSError *parseErr = nil;
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&parseErr];
+        if (parseErr || ![json isKindOfClass:[NSDictionary class]]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) completion(nil, parseErr);
+            });
+            return;
+        }
+
+        if (json[@"error"]) {
+            NSString *errMsg = json[@"error"][@"message"] ?: @"Lỗi từ Gemini API";
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) completion([NSString stringWithFormat:@"❌ %@", errMsg], nil);
+            });
+            return;
+        }
+
+        NSString *text = nil;
+        NSArray *candidates = json[@"candidates"];
+        if ([candidates isKindOfClass:[NSArray class]] && candidates.count > 0) {
+            NSDictionary *content = candidates.firstObject[@"content"];
+            NSArray *parts = content[@"parts"];
+            if ([parts isKindOfClass:[NSArray class]] && parts.count > 0) {
+                text = parts.firstObject[@"text"];
+            }
+        }
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            completion(text ?: @"Không parse được phản hồi.", nil);
+            if (completion) {
+                completion(text ?: @"Không parse được phản hồi.", nil);
+            }
         });
 
     }] resume];
