@@ -21,8 +21,8 @@ jobs:
 
     - name: Setup iOS SDK
       run: |
-        git clone https://github.com/theos/sdks.git ~/sdks-repo
-        cp -r ~/sdks-repo/*.sdk ~/theos/sdks/
+        git clone --depth=1 https://github.com/theos/sdks.git ~/sdks-repo
+        cp -r ~/sdks-repo/iPhoneOS*.sdk ~/theos/sdks/ || true
         rm -rf ~/sdks-repo
 
     - name: Build DEB Package
