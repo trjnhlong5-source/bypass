@@ -13,9 +13,9 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v3
 
-    - name: Install ldid
+    - name: Install ldid & dpkg
       run: |
-        brew install ldid
+        brew install ldid dpkg
 
     - name: Setup Theos
       run: |
@@ -28,6 +28,14 @@ jobs:
         git clone --depth=1 https://github.com/theos/sdks.git ~/sdks-repo
         cp -r ~/sdks-repo/iPhoneOS*.sdk ~/theos/sdks/ || true
         rm -rf ~/sdks-repo
+
+    - name: Verify Project Files
+      run: |
+        ls -la
+        if [ ! -f "OnluyenAISolver.plist" ]; then
+          echo "Error: OnluyenAISolver.plist is missing!"
+          exit 1
+        fi
 
     - name: Build DEB Package
       run: |
