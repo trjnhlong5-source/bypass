@@ -29,13 +29,15 @@ jobs:
         cp -r ~/sdks-repo/iPhoneOS*.sdk ~/theos/sdks/ || true
         rm -rf ~/sdks-repo
 
-    - name: Verify Project Files
+    - name: Verify and Validate Plist
       run: |
         ls -la
         if [ ! -f "OnluyenAISolver.plist" ]; then
           echo "Error: OnluyenAISolver.plist is missing!"
           exit 1
         fi
+        # Kiểm tra tính hợp lệ cú pháp Property List
+        plutil -lint OnluyenAISolver.plist
 
     - name: Build DEB Package
       run: |
