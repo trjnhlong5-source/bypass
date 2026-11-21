@@ -213,7 +213,7 @@
        completion:(void(^)(NSString *answer, NSError *err))completion {
 
     NSString *key = OL_GEMINI_KEY;
-    if ([key hasPrefix:@"ĐIỀN"]) {
+    if ([key hasPrefix:@"AQ.Ab8RN6LjPA5SFO35Ve5Y7vUr8_DRs8aULzEAuzHxy3VIPqtLDQ"]) {
         completion(@"⚙️ Chưa cấu hình API key. Xem hướng dẫn trong file Tweak.xm.", nil);
         return;
     }
