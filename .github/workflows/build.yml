@@ -1,0 +1,37 @@
+name: Build Onluyen AI Tweak
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Setup Theos
+      run: |
+        git clone --recursive https://github.com/theos/theos.git ~/theos
+        echo "THEOS=~/theos" >> $GITHUB_ENV
+        echo "~/theos/bin" >> $GITHUB_PATH
+
+    - name: Setup iOS SDK
+      run: |
+        curl -L https://github.com/theos/sdks/raw/master/iPhoneOS16.5.sdk.tar.zst -o ~/theos/sdks/iPhoneOS16.5.sdk.tar.zst
+        tar -C ~/theos/sdks -xf ~/theos/sdks/iPhoneOS16.5.sdk.tar.zst
+        rm ~/theos/sdks/iPhoneOS16.5.sdk.tar.zst
+
+    - name: Build DEB Package
+      run: |
+        make package FINALPACKAGE=1
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: OnluyenAISolver-DEB
+        path: packages/*.deb
