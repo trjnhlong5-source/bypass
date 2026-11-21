@@ -21,9 +21,9 @@ jobs:
 
     - name: Setup iOS SDK
       run: |
-        curl -L https://github.com/theos/sdks/raw/master/iPhoneOS16.5.sdk.tar.zst -o ~/theos/sdks/iPhoneOS16.5.sdk.tar.zst
-        tar -C ~/theos/sdks -xf ~/theos/sdks/iPhoneOS16.5.sdk.tar.zst
-        rm ~/theos/sdks/iPhoneOS16.5.sdk.tar.zst
+        git clone https://github.com/theos/sdks.git ~/sdks-repo
+        cp -r ~/sdks-repo/*.sdk ~/theos/sdks/
+        rm -rf ~/sdks-repo
 
     - name: Build DEB Package
       run: |
