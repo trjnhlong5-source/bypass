@@ -1,99 +1,213 @@
+// Tweak.xm - OLSolver
+// Mục đích: Nút nổi quét nội dung màn hình làm bài Onluyen
+
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-// Khai báo giao diện nút bấm nổi AI trên màn hình làm bài Onluyen
-@interface OnluyenAIManager : NSObject
-+ (instancetype)sharedInstance;
-- (void)createFloatingButton;
-- (void)solveCurrentQuiz;
+// ─── Manager ───────────────────────────────────────────────────────────────
+
+@interface OLSolverManager : NSObject
++ (instancetype)shared;
+- (void)ensureButtonExists;
+- (void)runScan;
+- (void)handlePan:(UIPanGestureRecognizer *)g;
 @end
 
-@implementation OnluyenAIManager {
-    UIButton *floatingBtn;
+@implementation OLSolverManager {
+    UIButton *_floatBtn;
 }
 
-+ (instancetype)sharedInstance {
-    static OnluyenAIManager *shared = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        shared = [[OnluyenAIManager alloc] init];
-    });
-    return shared;
++ (instancetype)shared {
+    static OLSolverManager *inst = nil;
+    static dispatch_once_t tok;
+    dispatch_once(&tok, ^{ inst = [OLSolverManager new]; });
+    return inst;
 }
 
-- (void)createFloatingButton {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        UIWindow *window = nil;
-        if (@available(iOS 13.0, *)) {
-            for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
-                if (scene.activationState == UISceneActivationStateForegroundActive) {
-                    for (UIWindow *w in scene.windows) {
-                        if (w.isKeyWindow) {
-                            window = w;
-                            break;
-                        }
-                    }
-                }
+// Lấy key window an toàn trên iOS 13+
+- (UIWindow *)activeWindow {
+    UIWindow *result = nil;
+    if (@available(iOS 13, *)) {
+        for (UIWindowScene *scene in UIApplication.sharedApplication.connectedScenes) {
+            if (scene.activationState != UISceneActivationStateForegroundActive) continue;
+            for (UIWindow *w in scene.windows) {
+                if (w.isKeyWindow) { result = w; break; }
             }
+            if (result) break;
         }
-        if (!window) {
-            window = [UIApplication sharedApplication].keyWindow;
-        }
+    }
+    return result ?: UIApplication.sharedApplication.keyWindow;
+}
 
-        if (window && ![window viewWithTag:99999]) {
-            self->floatingBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-            self->floatingBtn.frame = CGRectMake(window.bounds.size.width - 70, 150, 55, 55);
-            self->floatingBtn.backgroundColor = [UIColor colorWithRed:0.0 green:0.48 blue:1.0 alpha:0.9];
-            [self->floatingBtn setTitle:@"🤖 AI" forState:UIControlStateNormal];
-            [self->floatingBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-            self->floatingBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
-            self->floatingBtn.layer.cornerRadius = 27.5;
-            self->floatingBtn.layer.shadowColor = [UIColor blackColor].CGColor;
-            self->floatingBtn.layer.shadowOffset = CGSizeMake(0, 3);
-            self->floatingBtn.layer.shadowOpacity = 0.4;
-            self->floatingBtn.layer.shadowRadius = 4.0;
-            self->floatingBtn.tag = 99999;
-
-            [self->floatingBtn addTarget:self action:@selector(solveCurrentQuiz) forControlEvents:UIControlEventTouchUpInside];
-            [window addSubview:self->floatingBtn];
-        }
+- (void)ensureButtonExists {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIWindow *win = [self activeWindow];
+        if (!win) return;
+        
+        // Đã có rồi thì thôi, không tạo lại
+        if ([win viewWithTag:0xAB0CD]) return;
+        
+        CGRect frame = CGRectMake(win.bounds.size.width - 72, 190, 58, 58);
+        
+        _floatBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        _floatBtn.tag   = 0xAB0CD;
+        _floatBtn.frame = frame;
+        _floatBtn.backgroundColor = [UIColor colorWithRed:0.06 green:0.49 blue:0.98 alpha:0.93];
+        _floatBtn.layer.cornerRadius  = 29;
+        _floatBtn.layer.masksToBounds = NO;
+        _floatBtn.layer.shadowColor   = [UIColor blackColor].CGColor;
+        _floatBtn.layer.shadowOpacity = 0.38;
+        _floatBtn.layer.shadowRadius  = 6;
+        _floatBtn.layer.shadowOffset  = CGSizeMake(0, 3);
+        
+        [_floatBtn setTitle:@"🤖" forState:UIControlStateNormal];
+        _floatBtn.titleLabel.font = [UIFont systemFontOfSize:24];
+        
+        // Tap → scan
+        [_floatBtn addTarget:self
+                      action:@selector(runScan)
+            forControlEvents:UIControlEventTouchUpInside];
+        
+        // Kéo thả được
+        UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc]
+            initWithTarget:self action:@selector(handlePan:)];
+        [_floatBtn addGestureRecognizer:pan];
+        
+        [win addSubview:_floatBtn];
+        
+        NSLog(@"[OLSolver] Nút đã tạo thành công trên window: %@", win);
     });
 }
 
-- (void)solveCurrentQuiz {
-    // Thuật toán AI phân tích nội dung câu hỏi lớp 9 và tự động kích hoạt đáp án đúng
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Onluyen AI Solver"
-        message:@"Đã phân tích toàn bộ câu hỏi lớp 9! AI đã tự động chọn đáp án chính xác 100%."
-        preferredStyle:UIAlertControllerStyleAlert];
+- (void)handlePan:(UIPanGestureRecognizer *)g {
+    UIView *btn = g.view;
+    UIView *parent = btn.superview;
+    
+    CGPoint delta = [g translationInView:parent];
+    CGPoint newCenter = CGPointMake(btn.center.x + delta.x,
+                                    btn.center.y + delta.y);
+    
+    // Giữ nút trong bounds màn hình
+    CGFloat halfW = btn.bounds.size.width  / 2.0;
+    CGFloat halfH = btn.bounds.size.height / 2.0;
+    newCenter.x = MAX(halfW,  MIN(parent.bounds.size.width  - halfW,  newCenter.x));
+    newCenter.y = MAX(halfH + 44, MIN(parent.bounds.size.height - halfH - 34, newCenter.y));
+    
+    btn.center = newCenter;
+    [g setTranslation:CGPointZero inView:parent];
+}
 
-    [alert addAction:[UIAlertAction actionWithTitle:@"OK, Đã hiểu" style:UIAlertActionStyleDefault handler:nil]];
+// ─── Quét nội dung màn hình ────────────────────────────────────────────────
 
-    UIViewController *rootVC = [UIApplication sharedApplication].keyWindow.rootViewController;
-    while (rootVC.presentedViewController) {
-        rootVC = rootVC.presentedViewController;
+- (void)runScan {
+    UIWindow *win = [self activeWindow];
+    UIViewController *topVC = win.rootViewController;
+    while (topVC.presentedViewController) topVC = topVC.presentedViewController;
+    
+    // Thu thập tất cả text hiển thị
+    NSMutableArray<NSString *> *labels   = [NSMutableArray array];
+    NSMutableArray<NSString *> *buttons  = [NSMutableArray array];
+    
+    [self scanView:topVC.view labels:labels buttons:buttons depth:0];
+    
+    // Hiển thị kết quả
+    NSMutableString *msg = [NSMutableString string];
+    
+    if (labels.count > 0) {
+        [msg appendString:@"📋 NỘI DUNG:\n"];
+        // Lấy tối đa 8 label đầu (thường chứa câu hỏi)
+        NSArray *topLabels = labels.count > 8 ? [labels subarrayWithRange:NSMakeRange(0, 8)] : labels;
+        [msg appendString:[topLabels componentsJoinedByString:@"\n"]];
     }
-    [rootVC presentViewController:alert animated:YES completion:nil];
+    
+    if (buttons.count > 0) {
+        [msg appendString:@"\n\n🔘 CÁC LỰA CHỌN:\n"];
+        for (NSString *b in buttons) {
+            [msg appendFormat:@"  • %@\n", b];
+        }
+    }
+    
+    if (msg.length == 0) {
+        [msg appendString:@"Không tìm thấy nội dung câu hỏi.\nHãy vào màn hình làm bài trước khi bấm."];
+    }
+    
+    UIAlertController *alert = [UIAlertController
+        alertControllerWithTitle:@"🤖 AI Solver — Onluyen"
+        message:msg
+        preferredStyle:UIAlertControllerStyleAlert];
+    
+    [alert addAction:[UIAlertAction actionWithTitle:@"✕ Đóng"
+        style:UIAlertActionStyleCancel handler:nil]];
+    
+    [topVC presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)scanView:(UIView *)view
+          labels:(NSMutableArray *)labels
+         buttons:(NSMutableArray *)buttons
+           depth:(NSInteger)depth {
+    
+    if (depth > 12) return; // Tránh đệ quy quá sâu
+    
+    if ([view isKindOfClass:[UILabel class]]) {
+        UILabel *lbl = (UILabel *)view;
+        NSString *t = [lbl.text stringByTrimmingCharactersInSet:
+                        NSCharacterSet.whitespaceAndNewlineCharacterSet];
+        if (t.length > 2 && ![labels containsObject:t]) {
+            [labels addObject:t];
+        }
+    }
+    else if ([view isKindOfClass:[UITextView class]]) {
+        UITextView *tv = (UITextView *)view;
+        NSString *t = [tv.text stringByTrimmingCharactersInSet:
+                        NSCharacterSet.whitespaceAndNewlineCharacterSet];
+        if (t.length > 2) [labels addObject:t];
+    }
+    else if ([view isKindOfClass:[UIButton class]]) {
+        UIButton *btn = (UIButton *)view;
+        // Bỏ qua nút của chính mình
+        if (btn.tag == 0xAB0CD) return;
+        NSString *t = [[btn titleForState:UIControlStateNormal]
+                        stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+        if (t.length > 1) [buttons addObject:t];
+    }
+    
+    for (UIView *sub in view.subviews) {
+        [self scanView:sub labels:labels buttons:buttons depth:depth + 1];
+    }
 }
 
 @end
 
-// Hook vào vòng đời khởi động của ứng dụng loop (Onluyen) để tiêm nút AI
-%hook loop__AppDelegate // Tên AppDelegate dựa trên plist thực thi 'loop'
+// ─── Hooks ─────────────────────────────────────────────────────────────────
 
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-    BOOL orig = %orig;
-    [[OnluyenAIManager sharedInstance] createFloatingButton];
-    return orig;
-}
-
-%end
-
-// Hook bổ sung vào UIViewController để đảm bảo nút AI luôn hiển thị trên màn hình làm bài
+// Hook UIViewController để inject nút sau khi màn hình render xong
 %hook UIViewController
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
-    [[OnluyenAIManager sharedInstance] createFloatingButton];
+    // Chỉ inject từ VC cấp cao (không phải popup nhỏ)
+    if (!self.presentingViewController && !self.navigationController.parentViewController) {
+        [[OLSolverManager shared] ensureButtonExists];
+    }
 }
 
 %end
+
+// ─── Constructor: chạy khi dylib được load vào process ────────────────────
+
+%ctor {
+    @autoreleasepool {
+        NSString *bid = [[NSBundle mainBundle] bundleIdentifier];
+        NSLog(@"[OLSolver] Loaded vào: %@", bid);
+        
+        // Dự phòng: lắng nghe khi app trở thành active
+        [[NSNotificationCenter defaultCenter]
+            addObserverForName:UIApplicationDidBecomeActiveNotification
+            object:nil
+            queue:NSOperationQueue.mainQueue
+            usingBlock:^(NSNotification *n) {
+                [[OLSolverManager shared] ensureButtonExists];
+            }];
+    }
+}
