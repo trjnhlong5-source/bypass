@@ -175,39 +175,7 @@
     return result;
 }
 
-- (void)askGemini:(NSString *)prompt
-       completion:(void(^)(NSString *answer, NSError *err))completion {
-
-    NSString *urlStr = [NSString stringWithFormat:
-        @"https://generativelanguage.googleapis.com/v1beta/models/"
-        @"gemini-2.0-flash:generateContent?key=%@", OL_GEMINI_KEY];
-
-    NSDictionary *body = @{
-        @"contents": @[@{ @"parts": @[@{ @"text": prompt }] }],
-        @"generationConfig": @{ @"temperature": @0.1, @"maxOutputTokens": @300 }
-    };
-
-    NSData *bodyData = [NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
-    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:
-        [NSURL URLWithString:urlStr]
-        cachePolicy:NSURLRequestUseProtocolCachePolicy
-        timeoutInterval:15.0];
-    req.HTTPMethod = @"POST";
-    [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    req.HTTPBody = bodyData;
-
-    [[[NSURLSession sharedSession] dataTaskWithRequest:req
-        completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
-        if (err) {
-            dispatch_async(dispatch_get_main_queue(), ^{ completion(nil, err); });
-            return;
-        }
-        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-        NSString *text = json[@"candidates"][0][@"content"][@"parts"][0][@"text"];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            completion(text ?: @"Không parse được phản hồi.", nil);
-        });
-    }] resume];
+result;
 }
 
 - (void)runScan {
